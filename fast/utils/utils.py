@@ -128,6 +128,16 @@ def save_and_maybe_display_image(inference_config, dump_img, should_display=Fals
         plt.show()
 
 
+def display_image(image):
+
+    image = post_process_image(image)
+    plt.imshow(image)
+    plt.show()
+    
+
+
+
+
 class SequentialSubsetSampler(Sampler):
     r"""Samples elements sequentially, always in the same order from a subset defined by size.
 
@@ -136,23 +146,27 @@ class SequentialSubsetSampler(Sampler):
         subset_size: defines the subset from which to sample from
     """
 
-    def __init__(self, data_source, subset_size):
+    def __init__(self, data_source, subset_size, subset_start):
         assert isinstance(data_source, Dataset) or isinstance(data_source, datasets.ImageFolder)
         self.data_source = data_source
 
         if subset_size is None:  # if None -> use the whole dataset
             subset_size = len(data_source)
         assert 0 < subset_size <= len(data_source), f'Subset size should be between (0, {len(data_source)}].'
+        
         self.subset_size = subset_size
+        self.subset_start = subset_start
+
+
 
     def __iter__(self):
-        return iter(range(self.subset_size))
+        return iter(range(self.subset_start,self.subset_start + self.subset_size))
 
     def __len__(self):
         return self.subset_size
 
 
-def get_training_data_loader(image_size, data_path, subset_size, batch_size, num_epochs, should_normalize=True, is_255_range=False):
+def get_training_data_loader(image_size, data_path, subset_size, batch_size, num_epochs, subset_start=0, should_normalize=True, is_255_range=False):
     """
         There are multiple ways to make this feed-forward NST working,
         including using 0..255 range (without any normalization) images during transformer net training,
@@ -168,10 +182,10 @@ def get_training_data_loader(image_size, data_path, subset_size, batch_size, num
     transform = transforms.Compose(transform_list)
 
     train_dataset = datasets.ImageFolder(data_path, transform)
-    sampler = SequentialSubsetSampler(train_dataset, subset_size)
+    sampler = SequentialSubsetSampler(train_dataset, subset_size, subset_start)
     subset_size = len(sampler)  # update in case it was None
     train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, drop_last=True)
-    print(f'Using {len(train_loader)*batch_size*num_epochs} datapoints ({len(train_loader)*num_epochs} batches) (MS COCO images) for transformer network training.')
+    print(f'Using {len(train_loader)*batch_size*num_epochs} datapoints ({len(train_loader)*num_epochs} batches) starting from image {subset_start} (MS COCO images) for transformer network training.')
     return train_loader
 
 
